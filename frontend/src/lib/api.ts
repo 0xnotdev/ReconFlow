@@ -16,6 +16,7 @@ export const auth = {
     api.post('/auth/token', new URLSearchParams({ username: email, password }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     ),
+  me: () => api.get('/auth/me'),
 }
 
 export const reconciliation = {
@@ -25,6 +26,7 @@ export const reconciliation = {
   updateStatus: (id: string, status: string) =>
     api.patch(`/discrepancies/${id}/status`, { status }),
   explain: (id: string) => api.get(`/discrepancies/${id}/explain`),
+  loadSampleData: () => api.post('/demo/load-sample-data'),
 }
 
 export const integrations = {

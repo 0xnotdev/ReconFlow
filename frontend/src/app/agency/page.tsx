@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { reconciliation, reports, integrations } from '@/lib/api'
+import { auth, reconciliation, reports, integrations } from '@/lib/api'
 import Link from 'next/link'
 
 interface Summary {
-  revenue_at_risk: number
-  recoverable_revenue: number
-  critical_findings: number
-  clients_requiring_attention: number
+  money_reconciled: number
+  money_at_risk: number
+  recoverable_amount: number
+  issues_found: number
 }
 
 interface Discrepancy {
@@ -56,17 +56,23 @@ export default function AgencyWorkspace() {
   const [activeView, setActiveView] = useState<'clients' | 'findings' | 'integrations'>('clients')
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
+  const [orgName, setOrgName] = useState('Sterling & Associates')
+  const [loadingSample, setLoadingSample] = useState(false)
 
   const loadData = async () => {
     try {
-      const [sumRes, listRes] = await Promise.all([
+      const [sumRes, listRes, meRes] = await Promise.all([
         reconciliation.summary(),
-        reconciliation.list({ status: 'open', limit: 100 })
+        reconciliation.list({ status: 'open', limit: 100 }),
+        auth.me().catch(() => ({ data: { org_name: 'Sterling & Associates' } }))
       ])
       setSummary(sumRes.data)
       setDiscrepancies(listRes.data.items)
+      if (meRes?.data?.org_name) {
+        setOrgName(meRes.data.org_name)
+      }
     } catch (e) {
-      // Silently fail — will show demo data
+      // Silently fail
     }
   }
 
@@ -81,6 +87,22 @@ export default function AgencyWorkspace() {
       console.error(e)
     }
     setRunningRecon(false)
+  }
+
+  const handleLoadSampleData = async () => {
+    setLoadingSample(true)
+    setUploadStatus('Loading sample ledger data...')
+    try {
+      await reconciliation.loadSampleData()
+      await loadData()
+      setUploadStatus('Sample ledger loaded and audited!')
+      setTimeout(() => setUploadStatus(''), 4000)
+    } catch (e) {
+      console.error(e)
+      setUploadStatus('Error loading sample data')
+      setTimeout(() => setUploadStatus(''), 4000)
+    }
+    setLoadingSample(false)
   }
 
   const downloadReport = () => {
@@ -114,11 +136,25 @@ export default function AgencyWorkspace() {
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  // Compute revenue-focused metrics
-  const totalRevAtRisk = summary?.revenue_at_risk || DEMO_CLIENTS.reduce((s, c) => s + c.revenue_at_risk, 0)
-  const totalRecoverable = DEMO_CLIENTS.reduce((s, c) => s + c.recoverable_revenue, 0)
-  const totalFindings = summary?.critical_findings || DEMO_CLIENTS.reduce((s, c) => s + c.open_findings, 0)
-  const totalCritical = DEMO_CLIENTS.reduce((s, c) => s + c.critical_findings, 0)
+  // Compute revenue-focused metrics using database data if active, else fallback to demo
+  const isRealActive = summary && (summary.money_reconciled > 0 || summary.issues_found > 0)
+  const totalRevAtRisk = isRealActive && summary ? summary.money_at_risk : DEMO_CLIENTS.reduce((s, c) => s + c.revenue_at_risk, 0)
+  const totalRecoverable = isRealActive && summary ? summary.recoverable_amount : DEMO_CLIENTS.reduce((s, c) => s + c.recoverable_revenue, 0)
+  const totalFindings = isRealActive && summary ? summary.issues_found : DEMO_CLIENTS.reduce((s, c) => s + c.open_findings, 0)
+  const totalCritical = isRealActive && summary ? summary.issues_found : DEMO_CLIENTS.reduce((s, c) => s + c.critical_findings, 0)
+
+  const clientsToShow = [
+    ...(isRealActive && summary ? [{
+      id: 'real-org',
+      name: `${orgName} (Active Workspace)`,
+      revenue_at_risk: summary.money_at_risk,
+      recoverable_revenue: summary.recoverable_amount,
+      open_findings: summary.issues_found,
+      critical_findings: summary.issues_found,
+      last_audit: 'Just now'
+    }] : []),
+    ...DEMO_CLIENTS
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -184,6 +220,13 @@ export default function AgencyWorkspace() {
         </div>
 
         <div className="px-4 py-3 border-t">
+          <button
+            onClick={handleLoadSampleData}
+            disabled={loadingSample || runningRecon}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 font-medium text-xs transition disabled:opacity-50 mb-2"
+          >
+            ⚡ {loadingSample ? 'Loading...' : 'Load Sample Audit Data'}
+          </button>
           <div className="flex gap-2">
             <button onClick={runRecon} disabled={runningRecon} className="flex-1 text-xs bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition disabled:opacity-50">
               {runningRecon ? 'Running...' : 'Run Audit'}
@@ -197,6 +240,14 @@ export default function AgencyWorkspace() {
 
       {/* Main */}
       <main className="ml-64 p-8">
+        {/* Status Toast */}
+        {uploadStatus && (
+          <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white text-sm font-medium px-5 py-3 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 animate-pulse">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {uploadStatus}
+          </div>
+        )}
+
         {/* Summary Metrics — PHASE 3 */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           <div className="rf-metric-card rf-metric-card-risk">
@@ -224,7 +275,7 @@ export default function AgencyWorkspace() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Client Risk Ranking</h2>
-              <span className="text-sm text-gray-500">{DEMO_CLIENTS.length} clients · Sorted by risk</span>
+              <span className="text-sm text-gray-500">{clientsToShow.length} clients · Sorted by risk</span>
             </div>
             <div className="bg-white rounded-2xl border overflow-hidden">
               <table className="w-full">
@@ -239,7 +290,7 @@ export default function AgencyWorkspace() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {DEMO_CLIENTS.sort((a, b) => b.revenue_at_risk - a.revenue_at_risk).map(client => (
+                  {[...clientsToShow].sort((a, b) => b.revenue_at_risk - a.revenue_at_risk).map(client => (
                     <tr key={client.id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{client.name}</div>

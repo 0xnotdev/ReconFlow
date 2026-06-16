@@ -2,7 +2,11 @@
 Demo endpoint — no authentication required.
 Returns realistic sample audit data for a fictional company.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.routers.auth import get_current_user
+from app.models.user import User
 from datetime import datetime, timedelta
 import random
 
@@ -428,4 +432,142 @@ def get_demo_client_audit(client_id: str):
             'current_risk': client['revenue_at_risk'],
             'change_pct': -13.0,
         },
+    }
+
+@router.post('/load-sample-data')
+async def load_sample_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.organization import Organization
+    from app.models.stripe_transaction import StripeTransaction
+    from app.models.shopify_order import ShopifyOrder
+    from app.models.quickbooks_entry import QuickBooksEntry
+    from app.models.discrepancy import Discrepancy, DiscrepancyStatus, IssueType
+    from fastapi import HTTPException
+
+    org = db.query(Organization).filter(Organization.owner_id == current_user.id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail='Organization not found')
+
+    # Clear existing data for this organization
+    db.query(StripeTransaction).filter(StripeTransaction.org_id == org.id).delete()
+    db.query(QuickBooksEntry).filter(QuickBooksEntry.org_id == org.id).delete()
+    db.query(ShopifyOrder).filter(ShopifyOrder.org_id == org.id).delete()
+    db.query(Discrepancy).filter(Discrepancy.org_id == org.id).delete()
+    db.commit()
+
+    import_time = datetime.utcnow()
+    
+    # 1. Reconciled entries helper
+    reconciled_txns = [
+        {"id": "rec_001", "name": "Alice Vance", "amount": 150.00, "date": import_time - timedelta(days=12)},
+        {"id": "rec_002", "name": "Bob Miller", "amount": 450.00, "date": import_time - timedelta(days=10)},
+        {"id": "rec_003", "name": "Charlie King", "amount": 890.00, "date": import_time - timedelta(days=8)},
+        {"id": "rec_004", "name": "Diana Ross", "amount": 1250.00, "date": import_time - timedelta(days=6)},
+        {"id": "rec_005", "name": "Ethan Hunt", "amount": 3200.00, "date": import_time - timedelta(days=4)},
+    ]
+    
+    def get_fee(amt):
+        return round(amt * 0.029 + 0.30, 2)
+
+    for r in reconciled_txns:
+        db.add(StripeTransaction(
+            org_id=org.id, stripe_id=f"ch_{r['id']}", amount=r['amount'], status="succeeded",
+            customer_name=r['name'], stripe_fee=get_fee(r['amount']), net_amount=r['amount'] - get_fee(r['amount']),
+            created_at=r['date'], imported_at=import_time
+        ))
+        db.add(ShopifyOrder(
+            org_id=org.id, shopify_id=f"sh_{r['id']}", order_number=f"100_{r['id']}", total_price=r['amount'],
+            financial_status="paid", customer_name=r['name'], gateway="stripe", created_at=r['date'], imported_at=import_time
+        ))
+        db.add(QuickBooksEntry(
+            org_id=org.id, qb_id=f"qb_{r['id']}", transaction_type="SalesReceipt", amount=r['amount'],
+            customer_name=r['name'], txn_date=r['date'], imported_at=import_time
+        ))
+
+    # 2. Missing in QB
+    db.add(StripeTransaction(
+        org_id=org.id, stripe_id="ch_miss_001", amount=2400.00, status="succeeded",
+        customer_name="Sarah Mitchell", customer_email="sarah@mitchelldesigns.com",
+        stripe_fee=get_fee(2400.00), net_amount=2400.00 - get_fee(2400.00),
+        created_at=import_time - timedelta(days=5), imported_at=import_time
+    ))
+    db.add(ShopifyOrder(
+        org_id=org.id, shopify_id="sh_miss_001", order_number="10098", total_price=2400.00,
+        financial_status="paid", customer_name="Sarah Mitchell", customer_email="sarah@mitchelldesigns.com",
+        gateway="stripe", created_at=import_time - timedelta(days=5), imported_at=import_time
+    ))
+
+    # 3. Duplicate QB
+    db.add(StripeTransaction(
+        org_id=org.id, stripe_id="ch_dup_001", amount=1850.00, status="succeeded",
+        customer_name="James Whitfield", customer_email="james@whitfieldcorp.com",
+        stripe_fee=get_fee(1850.00), net_amount=1850.00 - get_fee(1850.00),
+        created_at=import_time - timedelta(days=15), imported_at=import_time
+    ))
+    db.add(QuickBooksEntry(
+        org_id=org.id, qb_id="qb_dup_001a", transaction_type="Payment", amount=1850.00,
+        customer_name="James Whitfield", customer_email="james@whitfieldcorp.com",
+        txn_date=import_time - timedelta(days=15), imported_at=import_time
+    ))
+    db.add(QuickBooksEntry(
+        org_id=org.id, qb_id="qb_dup_001b", transaction_type="Payment", amount=1850.00,
+        customer_name="James Whitfield", customer_email="james@whitfieldcorp.com",
+        txn_date=import_time - timedelta(days=15), imported_at=import_time
+    ))
+
+    # 4. Refund Mismatch
+    db.add(StripeTransaction(
+        org_id=org.id, stripe_id="ch_ref_001", amount=3200.00, status="refunded",
+        customer_name="Elena Rodriguez", customer_email="elena@freshlooks.co",
+        refunded=True, refund_amount=3200.00,
+        created_at=import_time - timedelta(days=20), imported_at=import_time
+    ))
+    db.add(QuickBooksEntry(
+        org_id=org.id, qb_id="qb_ref_orig", transaction_type="SalesReceipt", amount=3200.00,
+        customer_name="Elena Rodriguez", customer_email="elena@freshlooks.co",
+        txn_date=import_time - timedelta(days=20), imported_at=import_time
+    ))
+
+    # 5. Revenue Leak
+    db.add(ShopifyOrder(
+        org_id=org.id, shopify_id="sh_leak_001", order_number="10105", total_price=1200.00,
+        financial_status="paid", customer_name="David Park", customer_email="david@parkenterprises.io",
+        gateway="stripe", created_at=import_time - timedelta(days=3), imported_at=import_time
+    ))
+
+    # 6. Chargeback Dispute Mismatch
+    db.add(StripeTransaction(
+        org_id=org.id, stripe_id="ch_dis_001", amount=890.00, status="succeeded", disputed=True,
+        customer_name="Monica Chen", customer_email="monica@chen.design",
+        created_at=import_time - timedelta(days=2), imported_at=import_time
+    ))
+    db.add(QuickBooksEntry(
+        org_id=org.id, qb_id="qb_dis_orig", transaction_type="SalesReceipt", amount=890.00,
+        customer_name="Monica Chen", customer_email="monica@chen.design",
+        txn_date=import_time - timedelta(days=2), imported_at=import_time
+    ))
+
+    # 7. Fee Variance
+    db.add(StripeTransaction(
+        org_id=org.id, stripe_id="ch_fee_001", amount=5000.00, status="succeeded",
+        customer_name="Peak Performance Gear", stripe_fee=250.00, net_amount=4750.00,
+        created_at=import_time - timedelta(days=1), imported_at=import_time
+    ))
+    db.add(QuickBooksEntry(
+        org_id=org.id, qb_id="qb_fee_orig", transaction_type="SalesReceipt", amount=4750.00,
+        customer_name="Peak Performance Gear", txn_date=import_time - timedelta(days=1), imported_at=import_time
+    ))
+
+    db.commit()
+
+    from app.services.reconciliation_engine import ReconciliationEngine
+    engine = ReconciliationEngine(str(org.id), db)
+    result = engine.run()
+
+    return {
+        "status": "success",
+        "message": "Sample data loaded and reconciliation run successfully.",
+        "details": result
     }

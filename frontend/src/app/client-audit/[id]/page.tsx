@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { reconciliation } from '@/lib/api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -20,6 +21,7 @@ interface Finding {
   recommended_action: string
   root_cause: string
   confidence_score: number
+  ai_explanation?: string | null
 }
 
 interface ClientAuditData {
@@ -99,13 +101,44 @@ export default function ClientAuditPage() {
   const clientId = params.id as string
   const [data, setData] = useState<ClientAuditData>(buildFallback(clientId))
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [explainingId, setExplainingId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/demo/client/${clientId}`)
-      .then(r => r.json())
+    const token = localStorage.getItem('rf_token')
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const url = clientId === 'real-org'
+      ? `${API_BASE}/discrepancies/audit`
+      : `${API_BASE}/demo/client/${clientId}`
+
+    fetch(url, { headers })
+      .then(r => {
+        if (!r.ok) throw new Error('API failed')
+        return r.json()
+      })
       .then(d => setData(d))
       .catch(() => { setData(buildFallback(clientId)) })
   }, [clientId])
+
+  const handleExplain = async (discId: string) => {
+    setExplainingId(discId)
+    try {
+      const res = await reconciliation.explain(discId)
+      setData(prev => {
+        const updatedFindings = prev.findings.map(f => {
+          if (f.id === discId) {
+            return { ...f, ai_explanation: res.data.explanation }
+          }
+          return f
+        })
+        return { ...prev, findings: updatedFindings }
+      })
+    } catch (e) {
+      console.error(e)
+    }
+    setExplainingId(null)
+  }
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -276,7 +309,23 @@ export default function ClientAuditPage() {
                           <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Why It Matters</div>
                           <div className="text-sm text-gray-700">{f.why_it_matters}</div>
                         </div>
-                        <div className="bg-blue-50 border-l-3 border-blue-500 p-4 rounded-r-lg">
+                        {f.ai_explanation ? (
+                          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1">
+                              <span>✨ AI Insight</span>
+                            </div>
+                            <div className="text-sm text-emerald-900 mt-1">{f.ai_explanation}</div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleExplain(f.id)}
+                            disabled={explainingId === f.id}
+                            className="w-full text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            ✨ {explainingId === f.id ? 'Analyzing discrepancy...' : 'Explain finding with AI'}
+                          </button>
+                        )}
+                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
                           <div className="text-xs font-semibold uppercase tracking-wider text-blue-700 mb-1">Recommended Action</div>
                           <div className="text-sm text-emerald-700 mb-1 font-semibold">Potential Recovery: ${fmt(f.recoverable_amount)}</div>
                           <div className="text-sm text-blue-900">{f.recommended_action}</div>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -52,7 +52,100 @@ async def get_summary(
             ).all()
         ),
         'money_at_risk': sum(d.amount or 0 for d in open_discs),
+        'recoverable_amount': sum(d.recoverable_amount or 0 for d in open_discs),
         'issues_found': len(open_discs),
+    }
+
+@router.get('/audit')
+async def get_real_audit(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from datetime import datetime
+    from app.models.discrepancy import DiscrepancyStatus
+
+    org = db.query(Organization).filter(Organization.owner_id == current_user.id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail='Organization not found')
+
+    open_discs = db.query(Discrepancy).filter(
+        Discrepancy.org_id == org.id,
+        Discrepancy.status == DiscrepancyStatus.OPEN
+    ).order_by(Discrepancy.amount.desc()).all()
+
+    # Compute metrics
+    revenue_at_risk = sum(d.amount or 0 for d in open_discs)
+    recoverable = sum(d.recoverable_amount or 0 for d in open_discs)
+    critical = sum(1 for d in open_discs if (d.confidence_score or 0) >= 0.90)
+
+    # Build findings data
+    findings = []
+    for d in open_discs:
+        severity = 'critical' if (d.confidence_score or 0) >= 0.90 else 'warning' if (d.confidence_score or 0) >= 0.80 else 'info'
+        findings.append({
+            'id': str(d.id),
+            'issue_type': d.issue_type.value,
+            'severity': severity,
+            'amount': d.amount or 0,
+            'financial_impact': d.amount or 0,
+            'recoverable_amount': d.recoverable_amount or 0,
+            'customer_name': d.customer_name,
+            'date': d.date.strftime('%Y-%m-%d') if d.date else None,
+            'what_happened': d.suggested_cause or f'A discrepancy of ${d.amount or 0:,.2f} was detected.',
+            'why_it_matters': d.why_it_matters or 'This discrepancy impacts your books and financial reporting.',
+            'recommended_action': d.recommended_action or 'Investigate and match the transactions.',
+            'root_cause': d.suggested_cause or 'Mismatch between data sources',
+            'confidence_score': d.confidence_score or 0,
+        })
+
+    # Impact breakdown
+    breakdown_map = {}
+    for f in findings:
+        it = f['issue_type']
+        if it not in breakdown_map:
+            breakdown_map[it] = {'issue_type': it, 'count': 0, 'total_impact': 0, 'total_recoverable': 0}
+        breakdown_map[it]['count'] += 1
+        breakdown_map[it]['total_impact'] = round(breakdown_map[it]['total_impact'] + f['financial_impact'], 2)
+        breakdown_map[it]['total_recoverable'] = round(breakdown_map[it]['total_recoverable'] + f['recoverable_amount'], 2)
+    
+    # Root causes
+    causes_map = {}
+    for d in open_discs:
+        rc = d.suggested_cause or 'Mismatch between data sources'
+        if rc not in causes_map:
+            causes_map[rc] = {'cause': rc, 'count': 0, 'total_impact': 0}
+        causes_map[rc]['count'] += 1
+        causes_map[rc]['total_impact'] = round(causes_map[rc]['total_impact'] + (d.amount or 0), 2)
+
+    return {
+        'client': {
+            'id': 'real-org',
+            'name': org.name,
+            'revenue_at_risk': revenue_at_risk,
+            'recoverable_revenue': recoverable,
+            'open_findings': len(open_discs),
+            'critical_findings': critical,
+            'last_audit': datetime.utcnow().strftime('%Y-%m-%d'),
+        },
+        'company': {
+            'name': org.name,
+            'audit_period': 'Active Ledger Audit',
+        },
+        'summary': {
+            'revenue_at_risk': revenue_at_risk,
+            'recoverable_revenue': recoverable,
+            'total_findings': len(open_discs),
+            'critical_findings': critical,
+        },
+        'findings': findings,
+        'impact_breakdown': list(breakdown_map.values()),
+        'root_causes': sorted(list(causes_map.values()), key=lambda x: x['total_impact'], reverse=True),
+        'trend': {
+            'direction': 'stable',
+            'previous_risk': revenue_at_risk,
+            'current_risk': revenue_at_risk,
+            'change_pct': 0.0,
+        }
     }
 
 @router.patch('/{disc_id}/status')
