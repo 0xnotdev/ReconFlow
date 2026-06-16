@@ -50,49 +50,16 @@ const SEVERITY_STYLES: Record<string, string> = {
   info: 'rf-severity-info',
 }
 
-const CLIENT_MAP: Record<string, { name: string; revenue_at_risk: number; recoverable_revenue: number; open_findings: number; critical_findings: number }> = {
-  'client-001': { name: 'Acme Commerce Co.', revenue_at_risk: 14820, recoverable_revenue: 11640, open_findings: 12, critical_findings: 5 },
-  'client-002': { name: 'Bloom & Vine Studio', revenue_at_risk: 8340, recoverable_revenue: 6120, open_findings: 8, critical_findings: 3 },
-  'client-003': { name: 'NovaTech Solutions', revenue_at_risk: 22150, recoverable_revenue: 18400, open_findings: 15, critical_findings: 7 },
-  'client-004': { name: 'Meridian Health Supply', revenue_at_risk: 5670, recoverable_revenue: 4200, open_findings: 6, critical_findings: 2 },
-  'client-005': { name: 'Peak Performance Gear', revenue_at_risk: 31200, recoverable_revenue: 24800, open_findings: 18, critical_findings: 9 },
-}
-
-const FALLBACK_FINDINGS: Finding[] = [
-  { id: 'f1', issue_type: 'missing_transaction', severity: 'critical', amount: 2400, financial_impact: 2400, recoverable_amount: 2400, customer_name: 'Sarah Mitchell', date: '2024-02-14', what_happened: 'A Stripe payment of $2,400.00 was received on February 14 but has no corresponding entry in QuickBooks.', why_it_matters: 'Revenue is understated by $2,400.00, affecting tax filings and profitability reporting.', recommended_action: 'Create a matching Sales Receipt in QuickBooks for $2,400.00 dated February 14, 2024.', root_cause: 'Payment received outside normal invoicing workflow', confidence_score: 0 },
-  { id: 'f2', issue_type: 'refund_mismatch', severity: 'critical', amount: 3200, financial_impact: 3200, recoverable_amount: 0, customer_name: 'Elena Rodriguez', date: '2024-03-05', what_happened: 'A $3,200.00 refund was processed in Stripe but no credit memo exists in QuickBooks.', why_it_matters: 'Your books overstate revenue by $3,200.00. This could trigger audit findings.', recommended_action: 'Create a Credit Memo in QuickBooks for $3,200.00 to Elena Rodriguez dated March 5, 2024.', root_cause: 'Refund processed in gateway but not in accounting', confidence_score: 0 },
-  { id: 'f3', issue_type: 'duplicate_transaction', severity: 'critical', amount: 1850, financial_impact: 1850, recoverable_amount: 1850, customer_name: 'James Whitfield', date: '2024-01-22', what_happened: 'A QuickBooks payment for $1,850.00 appears twice on January 22.', why_it_matters: 'Revenue is overstated by $1,850.00 due to the duplicate, which may result in overpaying taxes.', recommended_action: 'Remove the duplicate QuickBooks entry and verify the remaining entry matches the Stripe charge.', root_cause: 'Manual data entry error', confidence_score: 0 },
-  { id: 'f4', issue_type: 'revenue_leak', severity: 'critical', amount: 1200, financial_impact: 1200, recoverable_amount: 1200, customer_name: 'David Park', date: '2024-02-28', what_happened: 'Shopify order SH-44587 for $1,200.00 marked paid but no Stripe charge found.', why_it_matters: 'Payment may not have been collected — $1,200 potentially lost.', recommended_action: 'Verify payment status and initiate collection if unpaid.', root_cause: 'Payment gateway mismatch', confidence_score: 0 },
-  { id: 'f5', issue_type: 'chargeback_mismatch', severity: 'critical', amount: 890, financial_impact: 890, recoverable_amount: 0, customer_name: 'Monica Chen', date: '2024-03-12', what_happened: 'A $890.00 chargeback in Stripe with no QuickBooks adjustment.', why_it_matters: 'Revenue is overstated by $890.00. The lost funds are not reflected in statements.', recommended_action: 'Create a Journal Entry to record the chargeback loss of $890.00.', root_cause: 'Chargeback not synced to accounting', confidence_score: 0 },
-  { id: 'f6', issue_type: 'revenue_leak', severity: 'warning', amount: 2150, financial_impact: 2150, recoverable_amount: 2150, customer_name: 'Priya Sharma', date: '2024-02-10', what_happened: 'Shopify order SH-44102 for $2,150 shows paid but no Stripe charge found.', why_it_matters: 'Potential $2,150 unrecovered revenue.', recommended_action: 'Verify payment and collect if outstanding.', root_cause: 'Payment gateway mismatch', confidence_score: 0 },
-  { id: 'f7', issue_type: 'missing_transaction', severity: 'warning', amount: 780, financial_impact: 780, recoverable_amount: 780, customer_name: 'Taylor Brooks', date: '2024-03-18', what_happened: 'A $780 Stripe payment from Taylor Brooks missing from QuickBooks.', why_it_matters: 'Revenue understated by $780.', recommended_action: 'Create a Sales Receipt in QuickBooks for $780.', root_cause: 'Payment outside invoicing workflow', confidence_score: 0 },
-  { id: 'f8', issue_type: 'refund_mismatch', severity: 'warning', amount: 560, financial_impact: 560, recoverable_amount: 0, customer_name: 'Rachel Kim', date: '2024-02-20', what_happened: 'A $560 partial refund in Stripe not recorded in QuickBooks.', why_it_matters: 'Revenue overstated by $560.', recommended_action: 'Create a Credit Memo for $560 to Rachel Kim.', root_cause: 'Refund not synced', confidence_score: 0 },
-]
-
 function buildFallback(clientId: string): ClientAuditData {
-  const client = CLIENT_MAP[clientId] || CLIENT_MAP['client-001']
-  const findings = FALLBACK_FINDINGS.slice(0, client.open_findings)
   return {
-    client: { id: clientId, ...client, last_audit: '2024-03-28' },
-    company: { name: client.name, audit_period: 'January 1 – March 31, 2024' },
-    summary: { revenue_at_risk: client.revenue_at_risk, recoverable_revenue: client.recoverable_revenue, total_findings: client.open_findings, critical_findings: client.critical_findings },
-    findings,
-    impact_breakdown: [
-      { issue_type: 'missing_transaction', count: 2, total_impact: 3180, total_recoverable: 3180 },
-      { issue_type: 'refund_mismatch', count: 2, total_impact: 3760, total_recoverable: 0 },
-      { issue_type: 'revenue_leak', count: 2, total_impact: 3350, total_recoverable: 3350 },
-      { issue_type: 'duplicate_transaction', count: 1, total_impact: 1850, total_recoverable: 1850 },
-      { issue_type: 'chargeback_mismatch', count: 1, total_impact: 890, total_recoverable: 0 },
-    ],
-    root_causes: [
-      { cause: 'Refund processed in gateway but not in accounting', count: 2, total_impact: 3760 },
-      { cause: 'Payment gateway mismatch between Shopify and Stripe', count: 2, total_impact: 3350 },
-      { cause: 'Payment received outside normal invoicing workflow', count: 2, total_impact: 3180 },
-      { cause: 'Manual data entry error', count: 1, total_impact: 1850 },
-      { cause: 'Chargeback not synced to accounting', count: 1, total_impact: 890 },
-    ],
+    client: { id: clientId, name: 'Loading...', revenue_at_risk: 0, recoverable_revenue: 0, open_findings: 0, critical_findings: 0, last_audit: '-' },
+    company: { name: 'Loading...', audit_period: '-' },
+    summary: { revenue_at_risk: 0, recoverable_revenue: 0, total_findings: 0, critical_findings: 0 },
+    findings: [],
+    impact_breakdown: [],
+    root_causes: [],
     recommended_actions: [],
-    trend: { direction: 'improving', previous_risk: client.revenue_at_risk * 1.15, current_risk: client.revenue_at_risk, change_pct: -13.0 },
+    trend: { direction: 'stable', previous_risk: 0, current_risk: 0, change_pct: 0 },
   }
 }
 

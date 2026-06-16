@@ -39,14 +39,6 @@ const SEVERITY_STYLES: Record<string, string> = {
   info: 'rf-severity-info',
 }
 
-// Simulated client data for agency workspace (Phase 6)
-const DEMO_CLIENTS = [
-  { id: 'client-005', name: 'Peak Performance Gear', revenue_at_risk: 31200, recoverable_revenue: 24800, open_findings: 18, critical_findings: 9, last_audit: '2024-03-29' },
-  { id: 'client-003', name: 'NovaTech Solutions', revenue_at_risk: 22150, recoverable_revenue: 18400, open_findings: 15, critical_findings: 7, last_audit: '2024-03-30' },
-  { id: 'client-001', name: 'Acme Commerce Co.', revenue_at_risk: 14820, recoverable_revenue: 11640, open_findings: 12, critical_findings: 5, last_audit: '2024-03-28' },
-  { id: 'client-002', name: 'Bloom & Vine Studio', revenue_at_risk: 8340, recoverable_revenue: 6120, open_findings: 8, critical_findings: 3, last_audit: '2024-03-25' },
-  { id: 'client-004', name: 'Meridian Health Supply', revenue_at_risk: 5670, recoverable_revenue: 4200, open_findings: 6, critical_findings: 2, last_audit: '2024-03-22' },
-]
 
 export default function AgencyWorkspace() {
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -57,7 +49,7 @@ export default function AgencyWorkspace() {
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
   const [orgName, setOrgName] = useState('Sterling & Associates')
-  const [loadingSample, setLoadingSample] = useState(false)
+
 
   const loadData = async () => {
     try {
@@ -89,21 +81,7 @@ export default function AgencyWorkspace() {
     setRunningRecon(false)
   }
 
-  const handleLoadSampleData = async () => {
-    setLoadingSample(true)
-    setUploadStatus('Loading sample ledger data...')
-    try {
-      await reconciliation.loadSampleData()
-      await loadData()
-      setUploadStatus('Sample ledger loaded and audited!')
-      setTimeout(() => setUploadStatus(''), 4000)
-    } catch (e) {
-      console.error(e)
-      setUploadStatus('Error loading sample data')
-      setTimeout(() => setUploadStatus(''), 4000)
-    }
-    setLoadingSample(false)
-  }
+
 
   const downloadReport = () => {
     const token = localStorage.getItem('rf_token')
@@ -136,15 +114,14 @@ export default function AgencyWorkspace() {
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  // Compute revenue-focused metrics using database data if active, else fallback to demo
-  const isRealActive = summary && (summary.money_reconciled > 0 || summary.issues_found > 0)
-  const totalRevAtRisk = isRealActive && summary ? summary.money_at_risk : DEMO_CLIENTS.reduce((s, c) => s + c.revenue_at_risk, 0)
-  const totalRecoverable = isRealActive && summary ? summary.recoverable_amount : DEMO_CLIENTS.reduce((s, c) => s + c.recoverable_revenue, 0)
-  const totalFindings = isRealActive && summary ? summary.issues_found : DEMO_CLIENTS.reduce((s, c) => s + c.open_findings, 0)
-  const totalCritical = isRealActive && summary ? summary.issues_found : DEMO_CLIENTS.reduce((s, c) => s + c.critical_findings, 0)
+  // Compute revenue-focused metrics using database data
+  const totalRevAtRisk = summary?.money_at_risk || 0
+  const totalRecoverable = summary?.recoverable_amount || 0
+  const totalFindings = summary?.issues_found || 0
+  const totalCritical = summary?.issues_found || 0
 
-  const clientsToShow = [
-    ...(isRealActive && summary ? [{
+  const clientsToShow = summary ? [
+    {
       id: 'real-org',
       name: `${orgName} (Active Workspace)`,
       revenue_at_risk: summary.money_at_risk,
@@ -152,9 +129,8 @@ export default function AgencyWorkspace() {
       open_findings: summary.issues_found,
       critical_findings: summary.issues_found,
       last_audit: 'Just now'
-    }] : []),
-    ...DEMO_CLIENTS
-  ]
+    }
+  ] : []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -220,13 +196,7 @@ export default function AgencyWorkspace() {
         </div>
 
         <div className="px-4 py-3 border-t">
-          <button
-            onClick={handleLoadSampleData}
-            disabled={loadingSample || runningRecon}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 font-medium text-xs transition disabled:opacity-50 mb-2"
-          >
-            ⚡ {loadingSample ? 'Loading...' : 'Load Sample Audit Data'}
-          </button>
+
           <div className="flex gap-2">
             <button onClick={runRecon} disabled={runningRecon} className="flex-1 text-xs bg-emerald-600 text-white py-2 rounded-lg font-medium hover:bg-emerald-700 transition disabled:opacity-50">
               {runningRecon ? 'Running...' : 'Run Audit'}
