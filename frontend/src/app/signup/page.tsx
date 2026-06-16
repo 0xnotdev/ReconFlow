@@ -23,7 +23,7 @@ export default function SignupPage() {
       await auth.register({
         email,
         password,
-        name,
+        full_name: name,
         org_name: orgName
       })
       // Auto login after signup
