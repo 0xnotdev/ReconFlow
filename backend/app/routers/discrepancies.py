@@ -184,6 +184,7 @@ def _serialize(d: Discrepancy) -> dict:
         'status': d.status.value,
         'amount': d.amount,
         'customer_name': d.customer_name,
+        'client_name': d.client.name if d.client else None,
         'date': d.date.isoformat() if d.date else None,
         'stripe_ref': d.stripe_ref,
         'shopify_ref': d.shopify_ref,

@@ -17,6 +17,7 @@ interface Discrepancy {
   status: string
   amount: number
   customer_name: string
+  client_name: string | null
   date: string
   confidence_score: number
   suggested_cause: string
@@ -50,7 +51,7 @@ export default function AgencyWorkspace() {
   const [showImport, setShowImport] = useState(false)
   const [orgName, setOrgName] = useState('Sterling & Associates')
   const [clientList, setClientList] = useState<any[]>([])
-  const [selectedClientId, setSelectedClientId] = useState<string>('')
+  const [uploadClientId, setUploadClientId] = useState<string>('')
   const [showCreateClient, setShowCreateClient] = useState(false)
   const [newClientName, setNewClientName] = useState('')
 
@@ -58,8 +59,8 @@ export default function AgencyWorkspace() {
   const loadData = async () => {
     try {
       const [sumRes, listRes, meRes, clientsRes] = await Promise.all([
-        reconciliation.summary(selectedClientId || undefined),
-        reconciliation.list({ status: 'open', limit: 100, client_id: selectedClientId || undefined }),
+        reconciliation.summary(),
+        reconciliation.list({ status: 'open', limit: 100 }),
         auth.me().catch(() => ({ data: { org_name: 'Sterling & Associates' } })),
         clients.list()
       ])
@@ -74,16 +75,13 @@ export default function AgencyWorkspace() {
     }
   }
 
-  useEffect(() => { loadData() }, [selectedClientId])
+  useEffect(() => { loadData() }, [])
 
   const runRecon = async () => {
-    if (!selectedClientId) {
-      alert("Please select a client first.");
-      return;
-    }
     setRunningRecon(true)
     try {
-      await reconciliation.run(selectedClientId)
+      // For now, run globally for all clients to keep it simple, or loop through clients
+      await reconciliation.run('')
       await loadData()
     } catch (e) {
       console.error(e)
@@ -107,7 +105,7 @@ export default function AgencyWorkspace() {
       const res = await clients.create(newClientName)
       setNewClientName('')
       setShowCreateClient(false)
-      setSelectedClientId(res.data.id)
+      setUploadClientId(res.data.id)
       await loadData()
     } catch (e) {
       console.error(e)
@@ -115,7 +113,7 @@ export default function AgencyWorkspace() {
   }
 
   const handleCSVUpload = async (type: 'stripe' | 'quickbooks' | 'shopify', file: File) => {
-    if (!selectedClientId) {
+    if (!uploadClientId) {
       setUploadStatus('Please select a client first.');
       setTimeout(() => setUploadStatus(''), 3000);
       return;
@@ -123,7 +121,7 @@ export default function AgencyWorkspace() {
     setUploadStatus(`Uploading ${type} data...`)
     try {
       const uploader = type === 'stripe' ? integrations.uploadStripeCSV : type === 'quickbooks' ? integrations.uploadQBCSV : integrations.uploadShopifyCSV
-      const res = await uploader(file, selectedClientId)
+      const res = await uploader(file, uploadClientId)
       setUploadStatus(`Imported ${res.data.imported} ${type} records`)
       setTimeout(() => setUploadStatus(''), 3000)
     } catch (e) {
@@ -203,8 +201,8 @@ export default function AgencyWorkspace() {
               <div className="mb-3">
                 <select 
                   className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2 py-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={selectedClientId}
-                  onChange={(e) => setSelectedClientId(e.target.value)}
+                  value={uploadClientId}
+                  onChange={(e) => setUploadClientId(e.target.value)}
                 >
                   <option value="" disabled>Select a client...</option>
                   {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -382,6 +380,7 @@ export default function AgencyWorkspace() {
                           <div>
                             <div className="font-semibold text-gray-900">{ISSUE_LABELS[d.issue_type] || d.issue_type}</div>
                             <div className="text-sm text-gray-500 mt-0.5">
+                              {d.client_name ? <span className="font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded mr-1.5">{d.client_name}</span> : null}
                               {d.customer_name || 'Unknown'}{d.date ? ` · ${new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
                             </div>
                           </div>

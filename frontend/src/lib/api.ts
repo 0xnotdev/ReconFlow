@@ -26,7 +26,7 @@ export const clients = {
 }
 
 export const reconciliation = {
-  run: (client_id: string) => api.post('/reconciliation/run', { client_id }),
+  run: (client_id?: string) => api.post('/reconciliation/run', { client_id: client_id || null }),
   summary: (client_id?: string) => api.get('/discrepancies/summary', { params: { client_id } }),
   list: (params?: any) => api.get('/discrepancies/', { params }),
   updateStatus: (id: string, status: string) =>
