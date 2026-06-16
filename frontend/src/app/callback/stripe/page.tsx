@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 
-export default function StripeCallbackPage() {
+function StripeCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState('Verifying Stripe connection...')
@@ -64,5 +64,17 @@ export default function StripeCallbackPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function StripeCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex justify-center items-center text-white">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <StripeCallbackContent />
+    </Suspense>
   )
 }
