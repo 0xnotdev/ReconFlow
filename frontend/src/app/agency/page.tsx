@@ -190,6 +190,17 @@ export default function AgencyWorkspace() {
                   </label>
                 ))}
               </div>
+              <div className="mt-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <div className="text-[11px] text-blue-800 leading-tight">
+                    <span className="font-semibold block mb-1">Standard Exports Only (Regular Plan)</span>
+                    Please upload the default, out-of-the-box CSV exports directly from each platform. No manual column mapping or daily/monthly aggregate reports are supported.
+                    <br/><br/>
+                    Need custom CSV formats, P&amp;L parsing, or mapping? <a href="#" className="font-semibold underline hover:text-blue-900">Contact us for a Custom Plan</a>.
+                  </div>
+                </div>
+              </div>
               {uploadStatus && <div className="text-xs text-emerald-600 mt-2 font-medium">{uploadStatus}</div>}
             </div>
           )}
