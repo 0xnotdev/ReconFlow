@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { auth, reconciliation, reports, integrations } from '@/lib/api'
+import { auth, reconciliation, reports, integrations, clients } from '@/lib/api'
 import Link from 'next/link'
 
 interface Summary {
@@ -49,17 +49,23 @@ export default function AgencyWorkspace() {
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
   const [orgName, setOrgName] = useState('Sterling & Associates')
+  const [clientList, setClientList] = useState<any[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
+  const [showCreateClient, setShowCreateClient] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
 
 
   const loadData = async () => {
     try {
-      const [sumRes, listRes, meRes] = await Promise.all([
-        reconciliation.summary(),
-        reconciliation.list({ status: 'open', limit: 100 }),
-        auth.me().catch(() => ({ data: { org_name: 'Sterling & Associates' } }))
+      const [sumRes, listRes, meRes, clientsRes] = await Promise.all([
+        reconciliation.summary(selectedClientId || undefined),
+        reconciliation.list({ status: 'open', limit: 100, client_id: selectedClientId || undefined }),
+        auth.me().catch(() => ({ data: { org_name: 'Sterling & Associates' } })),
+        clients.list()
       ])
       setSummary(sumRes.data)
       setDiscrepancies(listRes.data.items)
+      setClientList(clientsRes.data)
       if (meRes?.data?.org_name) {
         setOrgName(meRes.data.org_name)
       }
@@ -68,12 +74,16 @@ export default function AgencyWorkspace() {
     }
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData() }, [selectedClientId])
 
   const runRecon = async () => {
+    if (!selectedClientId) {
+      alert("Please select a client first.");
+      return;
+    }
     setRunningRecon(true)
     try {
-      await reconciliation.run()
+      await reconciliation.run(selectedClientId)
       await loadData()
     } catch (e) {
       console.error(e)
@@ -90,11 +100,30 @@ export default function AgencyWorkspace() {
     window.open(`${API_BASE}/reports/view?token=${token}`, '_blank')
   }
 
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newClientName.trim()) return
+    try {
+      const res = await clients.create(newClientName)
+      setNewClientName('')
+      setShowCreateClient(false)
+      setSelectedClientId(res.data.id)
+      await loadData()
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const handleCSVUpload = async (type: 'stripe' | 'quickbooks' | 'shopify', file: File) => {
+    if (!selectedClientId) {
+      setUploadStatus('Please select a client first.');
+      setTimeout(() => setUploadStatus(''), 3000);
+      return;
+    }
     setUploadStatus(`Uploading ${type} data...`)
     try {
       const uploader = type === 'stripe' ? integrations.uploadStripeCSV : type === 'quickbooks' ? integrations.uploadQBCSV : integrations.uploadShopifyCSV
-      const res = await uploader(file)
+      const res = await uploader(file, selectedClientId)
       setUploadStatus(`Imported ${res.data.imported} ${type} records`)
       setTimeout(() => setUploadStatus(''), 3000)
     } catch (e) {
@@ -120,17 +149,7 @@ export default function AgencyWorkspace() {
   const totalFindings = summary?.issues_found || 0
   const totalCritical = summary?.issues_found || 0
 
-  const clientsToShow = summary && summary.issues_found > 0 ? [
-    {
-      id: 'real-org',
-      name: `${orgName} (Active Workspace)`,
-      revenue_at_risk: summary.money_at_risk,
-      recoverable_revenue: summary.recoverable_amount,
-      open_findings: summary.issues_found,
-      critical_findings: summary.issues_found,
-      last_audit: 'Just now'
-    }
-  ] : []
+  const clientsToShow = clientList
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -180,6 +199,16 @@ export default function AgencyWorkspace() {
               <div className="flex items-center justify-between mb-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Import Data</div>
                 <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+              <div className="mb-3">
+                <select 
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2 py-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedClientId}
+                  onChange={(e) => setSelectedClientId(e.target.value)}
+                >
+                  <option value="" disabled>Select a client...</option>
+                  {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 {(['stripe', 'quickbooks', 'shopify'] as const).map(type => (
@@ -256,7 +285,12 @@ export default function AgencyWorkspace() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Client Risk Ranking</h2>
-              <span className="text-sm text-gray-500">{clientsToShow.length} clients · Sorted by risk</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500">{clientsToShow.length} clients · Sorted by risk</span>
+                <button onClick={() => setShowCreateClient(true)} className="px-4 py-2 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-blue-100 transition text-sm">
+                  + Add Client
+                </button>
+              </div>
             </div>
             <div className="bg-white rounded-2xl border overflow-hidden">
               <table className="w-full">
@@ -275,12 +309,12 @@ export default function AgencyWorkspace() {
                     <tr>
                       <td colSpan={6} className="px-6 py-16 text-center">
                         <div className="flex flex-col items-center justify-center">
-                          <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                          <h3 className="text-lg font-medium text-gray-900 mb-1">No Client Data Yet</h3>
-                          <p className="text-sm text-gray-500 max-w-sm mb-6">Connect your first client integration or upload CSV ledger files to start identifying revenue leakage.</p>
-                          <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition shadow-sm">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                            Import Data
+                          <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" /></svg>
+                          <h3 className="text-lg font-medium text-gray-900 mb-1">No Clients Yet</h3>
+                          <p className="text-sm text-gray-500 max-w-sm mb-6">Create your first client profile to start importing their CSV data and running audits.</p>
+                          <button onClick={() => setShowCreateClient(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-sm">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            Create Client
                           </button>
                         </div>
                       </td>
@@ -424,6 +458,35 @@ export default function AgencyWorkspace() {
           </div>
         )}
       </main>
+
+      {/* Create Client Modal */}
+      {showCreateClient && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Add New Client</h3>
+              <button onClick={() => setShowCreateClient(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <form onSubmit={handleCreateClient} className="p-6">
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Client Business Name</label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={newClientName}
+                  onChange={e => setNewClientName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-900"
+                  placeholder="e.g. Peak Performance Gear"
+                />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white font-medium py-2.5 rounded-xl hover:bg-blue-700 transition shadow-sm">
+                Create Client Workspace
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

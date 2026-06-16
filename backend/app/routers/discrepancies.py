@@ -17,6 +17,7 @@ class StatusUpdate(BaseModel):
 
 @router.get('/')
 async def list_discrepancies(
+    client_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     issue_type: Optional[str] = Query(None),
     limit: int = Query(50, le=200),
@@ -26,6 +27,7 @@ async def list_discrepancies(
 ):
     org = db.query(Organization).filter(Organization.owner_id == current_user.id).first()
     q = db.query(Discrepancy).filter(Discrepancy.org_id == org.id)
+    if client_id: q = q.filter(Discrepancy.client_id == client_id)
     if status: q = q.filter(Discrepancy.status == status)
     if issue_type: q = q.filter(Discrepancy.issue_type == issue_type)
     total = q.count()
@@ -34,23 +36,24 @@ async def list_discrepancies(
 
 @router.get('/summary')
 async def get_summary(
+    client_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     org = db.query(Organization).filter(Organization.owner_id == current_user.id).first()
     from app.models.stripe_transaction import StripeTransaction
-    open_discs = db.query(Discrepancy).filter(
-        Discrepancy.org_id == org.id, Discrepancy.status == 'open'
-    ).all()
-    total_reconciled = db.query(StripeTransaction).filter(
-        StripeTransaction.org_id == org.id, StripeTransaction.status == 'succeeded'
-    ).count()
+    
+    disc_q = db.query(Discrepancy).filter(Discrepancy.org_id == org.id, Discrepancy.status == 'open')
+    stripe_q = db.query(StripeTransaction).filter(StripeTransaction.org_id == org.id, StripeTransaction.status == 'succeeded')
+    
+    if client_id:
+        disc_q = disc_q.filter(Discrepancy.client_id == client_id)
+        stripe_q = stripe_q.filter(StripeTransaction.client_id == client_id)
+        
+    open_discs = disc_q.all()
+    total_reconciled = stripe_q.count()
     return {
-        'money_reconciled': sum(
-            t.amount for t in db.query(StripeTransaction).filter(
-                StripeTransaction.org_id == org.id, StripeTransaction.status == 'succeeded'
-            ).all()
-        ),
+        'money_reconciled': sum(t.amount for t in stripe_q.all()),
         'money_at_risk': sum(d.amount or 0 for d in open_discs),
         'recoverable_amount': sum(d.recoverable_amount or 0 for d in open_discs),
         'issues_found': len(open_discs),
@@ -58,6 +61,7 @@ async def get_summary(
 
 @router.get('/audit')
 async def get_real_audit(
+    client_id: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

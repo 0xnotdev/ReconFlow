@@ -82,7 +82,7 @@ async def import_qb_transactions(
     db.commit()
     return imported
 
-def parse_qb_csv(file_content: bytes, org_id: str, db: Session) -> int:
+def parse_qb_csv(file_content: bytes, org_id: str, client_id: str, db: Session) -> int:
     '''QuickBooks Transaction List report CSV'''
     import csv, io
     reader = csv.DictReader(io.StringIO(file_content.decode('utf-8')))
@@ -103,6 +103,7 @@ def parse_qb_csv(file_content: bytes, org_id: str, db: Session) -> int:
             continue
         entry = QuickBooksEntry(
             org_id=org_id,
+            client_id=client_id,
             qb_id=txn_id.strip(),
             transaction_type=row.get('Transaction Type', 'Payment'),
             doc_number=row.get('Num', ''),

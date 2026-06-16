@@ -9,6 +9,7 @@ class ShopifyOrder(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey('clients.id'), index=True, nullable=True)
     shopify_id = Column(String, nullable=False, index=True)
     order_number = Column(String)
     total_price = Column(Float)
@@ -27,3 +28,4 @@ class ShopifyOrder(Base):
     imported_at = Column(DateTime)
 
     organization = relationship('Organization', back_populates='shopify_orders')
+    client = relationship('Client', back_populates='shopify_orders')

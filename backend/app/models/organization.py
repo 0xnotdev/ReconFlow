@@ -21,6 +21,7 @@ class Organization(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship('User', back_populates='organizations')
+    clients = relationship('Client', back_populates='organization', cascade="all, delete-orphan")
     stripe_transactions = relationship('StripeTransaction', back_populates='organization')
     shopify_orders = relationship('ShopifyOrder', back_populates='organization')
     quickbooks_entries = relationship('QuickBooksEntry', back_populates='organization')

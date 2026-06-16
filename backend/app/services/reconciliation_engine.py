@@ -16,28 +16,29 @@ EXPECTED_STRIPE_RATE = 0.029   # 2.9%
 EXPECTED_STRIPE_FLAT = 0.30    # $0.30 per transaction
 
 class ReconciliationEngine:
-    def __init__(self, org_id: str, db: Session):
+    def __init__(self, org_id: str, client_id: str, db: Session):
         self.org_id = org_id
+        self.client_id = client_id
         self.db = db
         self.discrepancies: List[Discrepancy] = []
 
     def run(self) -> dict:
         '''Run all detection passes. Returns summary dict.'''
-        logger.info(f'Starting reconciliation for org {self.org_id}')
+        logger.info(f'Starting reconciliation for org {self.org_id}, client {self.client_id}')
         # Clear old open discrepancies before re-running
         self.db.query(Discrepancy).filter(
-            and_(Discrepancy.org_id == self.org_id, Discrepancy.status == DiscrepancyStatus.OPEN)
+            and_(Discrepancy.org_id == self.org_id, Discrepancy.client_id == self.client_id, Discrepancy.status == DiscrepancyStatus.OPEN)
         ).delete()
         self.db.commit()
 
         stripe_txns = self.db.query(StripeTransaction).filter(
-            StripeTransaction.org_id == self.org_id
+            StripeTransaction.org_id == self.org_id, StripeTransaction.client_id == self.client_id
         ).all()
         qb_entries = self.db.query(QuickBooksEntry).filter(
-            QuickBooksEntry.org_id == self.org_id
+            QuickBooksEntry.org_id == self.org_id, QuickBooksEntry.client_id == self.client_id
         ).all()
         shopify_orders = self.db.query(ShopifyOrder).filter(
-            ShopifyOrder.org_id == self.org_id
+            ShopifyOrder.org_id == self.org_id, ShopifyOrder.client_id == self.client_id
         ).all()
 
         self._detect_missing_in_qb(stripe_txns, qb_entries)
@@ -80,6 +81,7 @@ class ReconciliationEngine:
             if not matched:
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.MISSING_TRANSACTION,
                     amount=txn.amount,
                     financial_impact=txn.amount,
@@ -101,6 +103,7 @@ class ReconciliationEngine:
             if key in seen:
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.DUPLICATE_TRANSACTION,
                     amount=e.amount,
                     financial_impact=e.amount,
@@ -126,6 +129,7 @@ class ReconciliationEngine:
             if refund_key not in qb_refund_amounts:
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.REFUND_MISMATCH,
                     amount=txn.refund_amount,
                     financial_impact=txn.refund_amount,
@@ -153,6 +157,7 @@ class ReconciliationEngine:
             if not found:
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.CHARGEBACK_MISMATCH,
                     amount=txn.amount,
                     financial_impact=txn.amount,
@@ -176,6 +181,7 @@ class ReconciliationEngine:
             if variance > 0.10:  # more than 10 cent variance
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.FEE_VARIANCE,
                     amount=variance,
                     financial_impact=variance,
@@ -209,6 +215,7 @@ class ReconciliationEngine:
             if not matched:
                 self.discrepancies.append(Discrepancy(
                     org_id=self.org_id,
+                    client_id=self.client_id,
                     issue_type=IssueType.REVENUE_LEAK,
                     amount=order.total_price,
                     financial_impact=order.total_price,

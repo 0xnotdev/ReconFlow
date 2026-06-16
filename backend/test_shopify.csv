@@ -1,0 +1,3 @@
+Name,Total,Created at,Financial Status,Email,Payment Method
+SH-100,150.00,2026-06-15 18:55:06 +0000,paid,alice@example.com,stripe
+SH-LEAK,1200.00,2026-06-10 18:55:06 +0000,paid,leak@example.com,stripe

@@ -71,7 +71,7 @@ async def import_stripe_transactions(
     db.commit()
     return imported
 
-def parse_stripe_csv(file_content: bytes, org_id: str, db: Session) -> int:
+def parse_stripe_csv(file_content: bytes, org_id: str, client_id: str, db: Session) -> int:
     '''Parse Stripe CSV export. Headers vary by export type.'''
     import csv, io
     reader = csv.DictReader(io.StringIO(file_content.decode('utf-8')))
@@ -92,6 +92,7 @@ def parse_stripe_csv(file_content: bytes, org_id: str, db: Session) -> int:
             continue
         txn = StripeTransaction(
             org_id=org_id,
+            client_id=client_id,
             stripe_id=charge_id,
             amount=amount,
             currency=row.get('Currency', 'usd'),

@@ -1,0 +1,6 @@
+id,Amount,Fee,Net,Created (UTC),Currency,Status,Customer Email
+ch_normal_1,150.00,4.65,145.35,2026-06-15 18:55:06,usd,succeeded,alice@example.com
+ch_missing_1,2400.00,69.90,2330.10,2026-06-14 18:55:06,usd,succeeded,sarah@example.com
+ch_dup_1,1850.00,53.95,1796.05,2026-06-13 18:55:06,usd,succeeded,james@example.com
+ch_ref_1,3200.00,93.10,3106.90,2026-06-12 18:55:06,usd,refunded,elena@example.com
+ch_fee_1,5000.00,180.00,4820.00,2026-06-11 18:55:06,usd,succeeded,highfee@example.com

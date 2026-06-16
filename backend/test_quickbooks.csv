@@ -1,0 +1,7 @@
+Num,Date,Transaction Type,Amount,Name,Memo/Description
+1001,06/15/2026,Payment,150.00,Alice,Paid
+1002,06/14/2026,Payment,50.00,Noise,Paid
+1003a,06/13/2026,Payment,1850.00,James,Paid
+1003b,06/13/2026,Payment,1850.00,James,Duplicate Entry Error
+1004,06/12/2026,Payment,3200.00,Elena,Paid but refund not recorded
+1005,06/11/2026,Payment,5000.00,HighFee Inc,Paid

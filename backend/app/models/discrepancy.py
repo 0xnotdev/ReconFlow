@@ -25,6 +25,7 @@ class Discrepancy(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey('clients.id'), index=True, nullable=True)
     issue_type = Column(SAEnum(IssueType), nullable=False)
     status = Column(SAEnum(DiscrepancyStatus), default=DiscrepancyStatus.OPEN)
     amount = Column(Float)
@@ -46,3 +47,4 @@ class Discrepancy(Base):
     detected_at = Column(DateTime, default=datetime.utcnow)
 
     organization = relationship('Organization', back_populates='discrepancies')
+    client = relationship('Client', back_populates='discrepancies')

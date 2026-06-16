@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -46,6 +46,7 @@ async def stripe_callback(
 @router.post('/upload-csv')
 async def upload_stripe_csv(
     file: UploadFile = File(...),
+    client_id: str = Form(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -53,5 +54,5 @@ async def upload_stripe_csv(
         raise HTTPException(400, 'Only CSV files accepted')
     content = await file.read()
     org = db.query(Organization).filter(Organization.owner_id == current_user.id).first()
-    count = stripe_service.parse_stripe_csv(content, str(org.id), db)
+    count = stripe_service.parse_stripe_csv(content, str(org.id), client_id, db)
     return {'imported': count}

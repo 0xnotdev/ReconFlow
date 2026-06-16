@@ -9,6 +9,7 @@ class StripeTransaction(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(UUID(as_uuid=True), ForeignKey('organizations.id'), index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey('clients.id'), index=True, nullable=True)
     stripe_id = Column(String, unique=True, nullable=False, index=True)
     amount = Column(Float, nullable=False)       # in dollars
     currency = Column(String, default='usd')
@@ -27,3 +28,4 @@ class StripeTransaction(Base):
     imported_at = Column(DateTime)
 
     organization = relationship('Organization', back_populates='stripe_transactions')
+    client = relationship('Client', back_populates='stripe_transactions')

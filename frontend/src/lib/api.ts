@@ -19,9 +19,15 @@ export const auth = {
   me: () => api.get('/auth/me'),
 }
 
+export const clients = {
+  list: () => api.get('/clients/'),
+  create: (name: string) => api.post('/clients/', { name }),
+  delete: (id: string) => api.delete(`/clients/${id}`),
+}
+
 export const reconciliation = {
-  run: () => api.post('/reconciliation/run'),
-  summary: () => api.get('/discrepancies/summary'),
+  run: (client_id: string) => api.post('/reconciliation/run', { client_id }),
+  summary: (client_id?: string) => api.get('/discrepancies/summary', { params: { client_id } }),
   list: (params?: any) => api.get('/discrepancies/', { params }),
   updateStatus: (id: string, status: string) =>
     api.patch(`/discrepancies/${id}/status`, { status }),
@@ -31,16 +37,16 @@ export const reconciliation = {
 
 export const integrations = {
   stripeConnectUrl: () => api.get('/stripe/connect-url'),
-  uploadStripeCSV: (file: File) => {
-    const form = new FormData(); form.append('file', file)
+  uploadStripeCSV: (file: File, clientId: string) => {
+    const form = new FormData(); form.append('file', file); form.append('client_id', clientId);
     return api.post('/stripe/upload-csv', form)
   },
-  uploadQBCSV: (file: File) => {
-    const form = new FormData(); form.append('file', file)
+  uploadQBCSV: (file: File, clientId: string) => {
+    const form = new FormData(); form.append('file', file); form.append('client_id', clientId);
     return api.post('/quickbooks/upload-csv', form)
   },
-  uploadShopifyCSV: (file: File) => {
-    const form = new FormData(); form.append('file', file)
+  uploadShopifyCSV: (file: File, clientId: string) => {
+    const form = new FormData(); form.append('file', file); form.append('client_id', clientId);
     return api.post('/shopify/upload-csv', form)
   },
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -15,6 +15,7 @@ router = APIRouter(prefix='/shopify', tags=['shopify'])
 @router.post('/upload-csv')
 async def upload_shopify_csv(
     file: UploadFile = File(...),
+    client_id: str = Form(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -41,6 +42,7 @@ async def upload_shopify_csv(
             continue
         order = ShopifyOrder(
             org_id=org.id,
+            client_id=client_id,
             shopify_id=order_id,
             order_number=order_id,
             total_price=total,
