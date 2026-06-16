@@ -73,12 +73,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     db.add(org)
     db.commit()
 
-    # Auto-seed sample financial data so the user sees a working dashboard immediately
-    try:
-        _seed_sample_data(org.id, db)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f'Auto-seed failed for org {org.id}: {e}')
+
 
     token = create_access_token({'sub': str(user.id)})
     return {'access_token': token, 'token_type': 'bearer'}
