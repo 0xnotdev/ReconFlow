@@ -100,9 +100,9 @@ export default function LandingPage() {
           {/* Hero Stats */}
           <div className="grid grid-cols-3 gap-6 mt-16 max-w-xl rf-fade-up rf-fade-up-delay-4">
             {[
-              { value: '$14,820', label: 'Revenue At Risk' },
-              { value: '$11,640', label: 'Recoverable Revenue' },
-              { value: '$139,680', label: 'Potential Annual Recovery' },
+              { value: 'Zero', label: 'Manual Spreadsheets' },
+              { value: 'Total', label: 'Revenue Visibility' },
+              { value: 'Instant', label: 'Anomaly Detection' },
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-white rf-number">{s.value}</div>
