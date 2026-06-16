@@ -1,0 +1,12 @@
+# ReconFlow
+.env
+.env.local
+node_modules/
+__pycache__/
+*.pyc
+venv/
+.next/
+backend/venv/
+
+venv/
+.venv/
