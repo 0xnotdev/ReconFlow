@@ -212,15 +212,8 @@ ISSUE_LABELS = {
 }
 
 
-def generate_report_pdf(org: Organization, db: Session) -> bytes:
-    """Generate the Revenue Risk Audit PDF."""
-    try:
-        from weasyprint import HTML
-    except Exception as e:
-        raise RuntimeError(
-            "PDF generation requires GTK3 runtime dependencies to be installed. "
-            "Please follow the installation instructions for WeasyPrint."
-        ) from e
+def render_report_template(org: Organization, db: Session) -> str:
+    """Render the report HTML content."""
     open_discs = db.query(Discrepancy).filter(
         Discrepancy.org_id == org.id,
         Discrepancy.status == DiscrepancyStatus.OPEN
@@ -302,6 +295,19 @@ def generate_report_pdf(org: Organization, db: Session) -> bytes:
         findings=findings,
         actions=actions,
     )
+    return html_content
+
+
+def generate_report_pdf(org: Organization, db: Session) -> bytes:
+    """Generate the Revenue Risk Audit PDF."""
+    try:
+        from weasyprint import HTML
+    except Exception as e:
+        raise RuntimeError(
+            "PDF generation requires GTK3 runtime dependencies to be installed. "
+            "Please follow the installation instructions for WeasyPrint."
+        ) from e
+    html_content = render_report_template(org, db)
     return HTML(string=html_content).write_pdf()
 
 

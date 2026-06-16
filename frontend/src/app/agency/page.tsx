@@ -83,15 +83,11 @@ export default function AgencyWorkspace() {
     setRunningRecon(false)
   }
 
-  const downloadReport = async () => {
-    try {
-      const res = await reports.download()
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
-      const a = document.createElement('a')
-      a.href = url; a.download = 'revenue-risk-audit.pdf'; a.click()
-    } catch (e) {
-      console.error(e)
-    }
+  const downloadReport = () => {
+    const token = localStorage.getItem('rf_token')
+    if (!token) return
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    window.open(`${API_BASE}/reports/view?token=${token}`, '_blank')
   }
 
   const handleCSVUpload = async (type: 'stripe' | 'quickbooks' | 'shopify', file: File) => {
