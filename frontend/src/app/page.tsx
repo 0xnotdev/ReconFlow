@@ -1,7 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import { SampleAudit } from '@/components/landing/sample-audit'
 
+const SAMPLE_FINDINGS = [
+  { type: 'Missing Transaction', amount: '$2,400', status: 'Recoverable', customer: 'Sarah M.' },
+  { type: 'Refund Not Recorded', amount: '$3,200', status: 'At Risk', customer: 'Elena R.' },
+  { type: 'Revenue Leak', amount: '$1,200', status: 'Recoverable', customer: 'David P.' },
+  { type: 'Duplicate Entry', amount: '$1,850', status: 'Recoverable', customer: 'James W.' },
+  { type: 'Chargeback Missing', amount: '$890', status: 'At Risk', customer: 'Monica C.' },
+]
 
 const HOW_IT_WORKS = [
   { step: '01', title: 'Find Lost Revenue', desc: 'Upload client financial data and uncover hidden revenue loss in minutes.' },
@@ -30,9 +38,12 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm text-gray-600">
             <a href="#how-it-works" className="hover:text-gray-900 transition">How It Works</a>
             <a href="#use-cases" className="hover:text-gray-900 transition">Use Cases</a>
+            <a href="#pricing" className="hover:text-gray-900 transition">Pricing</a>
           </div>
           <div className="flex items-center gap-3">
-
+            <Link href="/demo" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition px-3 py-2">
+              View Demo
+            </Link>
             <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition px-3 py-2">
               Sign In
             </Link>
@@ -63,11 +74,11 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 rf-fade-up rf-fade-up-delay-3">
               <Link
-                href="/signup"
+                href="/demo"
                 className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white font-semibold px-8 py-4 rounded-xl text-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/25 rf-pulse"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                Get Started
+                View Interactive Demo
               </Link>
               <a
                 href="/sample-audit.pdf"
@@ -89,9 +100,9 @@ export default function LandingPage() {
           {/* Hero Stats */}
           <div className="grid grid-cols-3 gap-6 mt-16 max-w-xl rf-fade-up rf-fade-up-delay-4">
             {[
-              { value: 'Zero', label: 'Manual Spreadsheets' },
-              { value: 'Total', label: 'Revenue Visibility' },
-              { value: 'Instant', label: 'Anomaly Detection' },
+              { value: '$14,820', label: 'Revenue At Risk' },
+              { value: '$11,640', label: 'Recoverable Revenue' },
+              { value: '$139,680', label: 'Potential Annual Recovery' },
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-white rf-number">{s.value}</div>
@@ -102,6 +113,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Audit Preview */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-4">
+              What a Revenue Risk Audit Looks Like
+            </h2>
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+              In minutes, ReconFlow generates a complete audit showing exactly where your client is losing money.
+            </p>
+          </div>
+
+          <SampleAudit />
+        </div>
+      </section>
 
       {/* Revenue at Risk Examples */}
       <section className="py-20 bg-white">
@@ -116,14 +142,18 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: '💸', title: 'Missing Transactions', desc: 'Payments received in Stripe but never recorded in QuickBooks. Revenue is understated and taxes may be wrong.' },
-              { icon: '🔁', title: 'Unrecorded Refunds', desc: 'Refunds processed in Stripe but not reflected in your books. Revenue appears higher than it actually is.' },
-              { icon: '🕳️', title: 'Revenue Leaks', desc: 'Shopify orders marked as paid but no matching payment collected. Money that should have been received was not.' },
+              { icon: '💸', title: 'Missing Transactions', desc: 'Payments received in Stripe but never recorded in QuickBooks. Revenue is understated and taxes may be wrong.', amount: '$2,400 – $15,000+', freq: 'Found in 73% of audits' },
+              { icon: '🔁', title: 'Unrecorded Refunds', desc: 'Refunds processed in Stripe but not reflected in your books. Revenue appears higher than it actually is.', amount: '$500 – $8,000+', freq: 'Found in 61% of audits' },
+              { icon: '🕳️', title: 'Revenue Leaks', desc: 'Shopify orders marked as paid but no matching payment collected. Money that should have been received was not.', amount: '$1,200 – $12,000+', freq: 'Found in 45% of audits' },
             ].map((item, i) => (
               <div key={i} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-gray-200 hover:shadow-lg transition">
                 <div className="text-3xl mb-4">{item.icon}</div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{item.title}</h3>
                 <p className="text-sm text-gray-600 mb-4 leading-relaxed">{item.desc}</p>
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <span className="text-sm font-semibold text-red-600">{item.amount}</span>
+                  <span className="text-xs text-gray-500">{item.freq}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -173,6 +203,81 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Pricing */}
+      <section id="pricing" className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-4">
+              Simple Pricing
+            </h2>
+            <p className="text-lg text-gray-500">Start free. Scale when you are ready.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Free */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Starter</div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="text-4xl font-bold text-gray-900">$0</span>
+                <span className="text-gray-500">/mo</span>
+              </div>
+              <p className="text-sm text-gray-500 mb-6">Try it with one client.</p>
+              <ul className="space-y-3 text-sm text-gray-700 mb-8">
+                {['1 client', 'CSV upload only', '1 audit per month', 'PDF export'].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/demo" className="block text-center py-3 px-6 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                Start Free
+              </Link>
+            </div>
+
+            {/* Pro */}
+            <div className="bg-slate-900 rounded-2xl p-8 text-white relative ring-2 ring-emerald-500">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider">Most Popular</div>
+              <div className="text-sm font-semibold text-emerald-400 uppercase tracking-wider mb-2">Professional</div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="text-4xl font-bold">$149</span>
+                <span className="text-gray-400">/mo</span>
+              </div>
+              <p className="text-sm text-gray-400 mb-6">For growing agencies.</p>
+              <ul className="space-y-3 text-sm text-gray-300 mb-8">
+                {['Up to 25 clients', 'API connections', 'Unlimited audits', 'PDF + white-label reports', 'Priority support'].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <a href="mailto:debansh@reconflow.com?subject=ReconFlow%20Pro%20Plan" className="block text-center py-3 px-6 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-400 transition">
+                Book Demo
+              </a>
+            </div>
+
+            {/* Enterprise */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Enterprise</div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="text-4xl font-bold text-gray-900">Custom</span>
+              </div>
+              <p className="text-sm text-gray-500 mb-6">For large practices.</p>
+              <ul className="space-y-3 text-sm text-gray-700 mb-8">
+                {['Unlimited clients', 'Custom integrations', 'Dedicated support', 'White-label everything', 'Custom reporting'].map((f, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <a href="mailto:debansh@reconflow.com?subject=ReconFlow%20Enterprise" className="block text-center py-3 px-6 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                Contact Us
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Final CTA */}
       <section className="py-20 bg-slate-900 text-white">
@@ -184,8 +289,8 @@ export default function LandingPage() {
             Your clients are losing revenue right now. ReconFlow helps you find it, quantify it, and recover it.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup" className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white font-semibold px-8 py-4 rounded-xl text-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/25">
-              Get Started
+            <Link href="/demo" className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white font-semibold px-8 py-4 rounded-xl text-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/25">
+              View Sample Audit
             </Link>
             <a href="mailto:debansh@reconflow.com?subject=Book%20a%20Demo" className="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-xl text-lg border border-white/20 hover:bg-white/20 transition">
               Book Demo

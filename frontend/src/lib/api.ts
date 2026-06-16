@@ -26,6 +26,7 @@ export const reconciliation = {
   updateStatus: (id: string, status: string) =>
     api.patch(`/discrepancies/${id}/status`, { status }),
   explain: (id: string) => api.get(`/discrepancies/${id}/explain`),
+  loadSampleData: () => api.post('/demo/load-sample-data'),
 }
 
 export const integrations = {
